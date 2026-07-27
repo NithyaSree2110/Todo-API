@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel
 from typing import Optional
 
@@ -10,9 +10,12 @@ tasks = [
     {"id": 3, "title": "Clean the room", "done": False},
 ]
 
-# Schema for incoming request body
 class TaskCreate(BaseModel):
     title: str
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
 
 @app.get("/")
 def read_root():
@@ -33,7 +36,6 @@ def get_task(task_id: int):
             return task
     raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-# POST /tasks -> creates a task with status 201
 @app.post("/tasks", status_code=201)
 def create_task(task_data: TaskCreate):
     if not task_data.title.strip():
@@ -47,3 +49,26 @@ def create_task(task_data: TaskCreate):
     }
     tasks.append(new_task)
     return new_task
+
+# PUT /tasks/{id} -> update title/done
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, task_data: TaskUpdate):
+    for task in tasks:
+        if task["id"] == task_id:
+            if task_data.title is not None:
+                if not task_data.title.strip():
+                    raise HTTPException(status_code=400, detail="Title cannot be empty")
+                task["title"] = task_data.title
+            if task_data.done is not None:
+                task["done"] = task_data.done
+            return task
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+# DELETE /tasks/{id} -> delete task (returns 204 No Content)
+@app.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(task_id: int):
+    for index, task in enumerate(tasks):
+        if task["id"] == task_id:
+            tasks.pop(index)
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
